@@ -4,6 +4,7 @@ import json
 import os
 
 import mdparser
+import config
 
 class SlackVCS(BotPlugin):
     """
@@ -33,7 +34,7 @@ class SlackVCS(BotPlugin):
             yield "Found post with matching name:"
             yield file_url
 
-            token = "REDACTED"
+            token = config.BOT_IDENTITY["token"]
             r = requests.get(file_url, headers = {'Authorization': ("Bearer " + token)})
             content_string = r.content.decode("utf-8")
 
