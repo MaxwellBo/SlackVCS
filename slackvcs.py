@@ -1,96 +1,51 @@
 from errbot import BotPlugin, botcmd, arg_botcmd, webhook
+import requests
+import json
+import os
 
+import mdparser
 
-class Slackvcs(BotPlugin):
+class SlackVCS(BotPlugin):
     """
     Version control for files uploaded to Slack
     """
+    
+    @botcmd
+    def pwd(self, msg, args):
+        return os.getcwd()
 
-    def activate(self):
-        """
-        Triggers on plugin activation
 
-        You should delete it if you're not using it to override any default behaviour
-        """
-        super(Slackvcs, self).activate()
 
-    def deactivate(self):
-        """
-        Triggers on plugin deactivation
+    @arg_botcmd("filename", type=str)
+    def track(self, msg, filename=None):
 
-        You should delete it if you're not using it to override any default behaviour
-        """
-        super(Slackvcs, self).deactivate()
+        method = "files.list"
+        data = { "types": "spaces" } # Only posts
 
-    def get_configuration_template(self):
-        """
-        Defines the configuration structure this plugin supports
+        request = self._bot.sc.api_call(method, data=data)
 
-        You should delete it if your plugin doesn't use any configuration like this
-        """
-        return {'EXAMPLE_KEY_1': "Example value",
-                'EXAMPLE_KEY_2': ["Example", "Value"]
-               }
+        matching = [ i for i in request["files"] if i["title"] == filename ]
 
-    def check_configuration(self, configuration):
-        """
-        Triggers when the configuration is checked, shortly before activation
+        if len(matching) == 0:
+            return "Post with that name does not exist"
+        elif len(matching) == 1:
+            file_url = matching[0]["url_private"]
+            yield "Found post with matching name:"
+            yield file_url
 
-        Raise a errbot.utils.ValidationException in case of an error
+            token = "REDACTED"
+            r = requests.get(file_url, headers = {'Authorization': ("Bearer " + token)})
+            content_string = r.content.decode("utf-8")
 
-        You should delete it if you're not using it to override any default behaviour
-        """
-        super(Slackvcs, self).check_configuration(configuration)
-
-    def callback_connect(self):
-        """
-        Triggers when bot is connected
-
-        You should delete it if you're not using it to override any default behaviour
-        """
-        pass
-
-    def callback_message(self, message):
-        """
-        Triggered for every received message that isn't coming from the bot itself
-
-        You should delete it if you're not using it to override any default behaviour
-        """
-        pass
-
-    def callback_botmessage(self, message):
-        """
-        Triggered for every message that comes from the bot itself
-
-        You should delete it if you're not using it to override any default behaviour
-        """
-        pass
-
-    @webhook
-    def example_webhook(self, incoming_request):
-        """A webhook which simply returns 'Example'"""
-        return "Example"
-
-    # Passing split_args_with=None will cause arguments to be split on any kind
-    # of whitespace, just like Python's split() does
-    @botcmd(split_args_with=None)
-    def example(self, message, args):
-        """A command which simply returns 'Example'"""
-        return "Example"
-
-    @arg_botcmd('name', type=str)
-    @arg_botcmd('--favorite-number', type=int, unpack_args=False)
-    def hello(self, message, args):
-        """
-        A command which says hello to someone.
-
-        If you include --favorite-number, it will also tell you their
-        favorite number.
-        """
-        if args.favorite_number is None:
-            return "Hello {name}".format(name=args.name)
+            p = mdparser.JSONToMarkdownParser()
+            p.parse(content_string, "output.md")
+            yield filename + " successfully tracked"
         else:
-            return "Hello {name}, I hear your favorite number is {number}".format(
-                name=args.name,
-                number=args.favorite_number,
-            )
+            return "Multiple posts with that name found. Please rename to resolve name collision."
+
+
+    @botcmd(split_args_with=None)
+    def debug_placeholder(self, msg, args):
+        """A command which simply returns 'Example'"""
+        return str(args)
+
